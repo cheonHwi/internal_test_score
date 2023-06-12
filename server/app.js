@@ -1,10 +1,18 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const axios = require("axios");
+const cors = require("cors");
+
+const app = express();
 
 dotenv.config();
 
-const app = express();
+app.use(
+  cors({
+    origin: "http://localhost:5173", // 허용할 도메인
+    credentials: true, // 인증 정보(쿠키 등)를 전달하려면 true로 설정
+  })
+);
 
 const {
   GOOGLE_TOKEN_URL,
@@ -17,14 +25,6 @@ const {
 
 const baseUrl = "https://accounts.google.com/o/oauth2/v2/auth";
 
-app.get("/", (req, res) => {
-  res.send(`
-        <h1>OAuth</h1>
-        <a href="/login">Log in</a>
-        <a href="/signup">Sign up</a>
-    `);
-});
-
 app.get("/login", (req, res) => {
   let loginUrl = baseUrl;
   loginUrl += `?client_id=${GOOGLE_CLIENT_ID}`;
@@ -32,6 +32,7 @@ app.get("/login", (req, res) => {
   loginUrl += "&response_type=code";
   loginUrl += "&scope=email profile";
   res.redirect(loginUrl);
+  //   res.status(200).json({ data: payLoad });
 });
 
 app.get("/login/redirect", (req, res) => {
@@ -50,23 +51,26 @@ app.get("/signup", (req, res) => {
 });
 
 app.get("/signup/redirect", async (req, res) => {
-  const { code } = req.query;
+  const { access_token } = req.query;
   console.log(`code: ${code}`);
+  try {
+    // const resp = await axios.post(GOOGLE_TOKEN_URL, {
+    //   code,
+    //   client_id: GOOGLE_CLIENT_ID,
+    //   client_secret: GOOGLE_CLIENT_SECRET,
+    //   redirect_uri: GOOGLE_SIGNUP_REDIRECT_URI,
+    //   grant_type: "authorization_code",
+    // });
 
-  const resp = await axios.post(GOOGLE_TOKEN_URL, {
-    code,
-    client_id: GOOGLE_CLIENT_ID,
-    client_secret: GOOGLE_CLIENT_SECRET,
-    redirect_uri: GOOGLE_SIGNUP_REDIRECT_URI,
-    grant_type: "authorization_code",
-  });
-
-  const resp2 = await axios.get(GOOGLE_USERINFO_URL, {
-    headers: {
-      Authorization: `Bearer ${resp.data.access_token}`,
-    },
-  });
-  res.json(resp2.data);
+    const resp2 = await axios.get(GOOGLE_USERINFO_URL, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
+    res.json(resp2.data);
+  } catch (error) {
+    res.send(error.message);
+  }
 });
 
 app.listen(3000, () => {
