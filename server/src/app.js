@@ -6,39 +6,44 @@ const path = require("path");
 const morgan = require("morgan");
 const express = require("express");
 const passport = require("passport");
-const cookieSession = require("cookie-session");
+const session = require("express-session");
+const cookieParser = require("cookie-parser");
+// const cookieSession = require("cookie-session");
 
 const mongooseConnect = require("./config/mongoose.config.js");
 
 const { authRouter, dataRouter, scoreRouter } = require("./routes");
 
 const { sessionRegenerate } = require("./middleware/utils.middleware.js");
-const {
-  checkAuthenticated,
-  checkNotAuthenticated,
-} = require("./middleware/passport.middleware.js");
 
 const PORT = process.env.SERVER_PORT || 3000;
 const url = process.env.MONGODB_URI || "mongodb://localhost/internal-test";
 
 const app = express();
 
+// app.use(
+//   cookieSession({
+//     name: "cookie-session-name",
+//     keys: [process.env.COOKIE_ENCRYPTION_KEY],
+//   })
+// );
+app.use(cookieParser("cookieSecret"));
 app.use(
-  cookieSession({
-    name: "cookie-session-name",
-    keys: [process.env.COOKIE_ENCRYPTION_KEY],
+  session({
+    saveUninitialized: false,
+    resave: false,
+    secret: "sessionSecret",
   })
 );
 
-app.use(sessionRegenerate);
-
-app.use(cors());
+app.use(cors({ credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
 app.use(passport.session());
 
 app.use(morgan("common"));
+app.use(sessionRegenerate);
 
 app.use("/auth", authRouter);
 app.use("/data", dataRouter);
@@ -46,44 +51,6 @@ app.use("/score", scoreRouter);
 
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
-
-app.get("/", checkAuthenticated, (req, res) => {
-  res.render("index");
-});
-
-app.get("/login", (req, res) => {
-  res.render("login");
-});
-
-app.post("/login", checkNotAuthenticated, (req, res, next) => {
-  passport.authenticate("local", (err, student, info) => {
-    if (err) {
-      return next(err);
-    }
-
-    if (!student) {
-      return res.json({ msg: info });
-    }
-
-    req.logIn(student, function (err) {
-      if (err) {
-        return next(err);
-      }
-      res.redirect("/");
-    });
-  })(req, res, next);
-});
-
-app.post("/logout", (req, res, next) => {
-  req.logout((err) => {
-    if (err) return next(err);
-    res.redirect("/");
-  });
-});
-
-app.get("/signup", checkNotAuthenticated, (req, res) => {
-  res.render("signup");
-});
 
 app.get("/*", (req, res) => {
   res.sendStatus(404);
